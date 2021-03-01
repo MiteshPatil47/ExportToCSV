@@ -1,0 +1,93 @@
+@using ExportToCSV.Models
+
+@{
+    ViewBag.Title = "Index";
+}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.0.0/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.9/jspdf.plugin.autotable.min.js"></script>
+<script>
+    window.jsPDF = window.jspdf.jsPDF;
+    applyPlugin(window.jsPDF);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/3.3.1/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/1.3.8/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/7.4.0/polyfill.min.js"></script>
+
+@(Html.DevExtreme().Button()
+    .ID("exportButton")
+    .Icon("exportpdf")
+    .Text("Export to PDF")
+    .OnClick("exportToPDF")
+)
+<h2>Home</h2>
+
+@(Html.DevExtreme().DataGrid<SampleOrder>()
+    .ID("gridContainer")
+    .ShowBorders(true)
+     .Selection(s => s.Mode(SelectionMode.Single))
+    .HoverStateEnabled(true)
+    .Export(e => e.Enabled(true).AllowExportSelectedData(true))
+    .DataSource(d => d.WebApi().Controller("SampleData").Key("OrderID"))
+    .OnExporting("exporting")
+    .Columns(columns => {
+        columns.AddFor(m => m.OrderID);
+        columns.AddFor(m => m.OrderDate);
+        columns.AddFor(m => m.CustomerName);
+        columns.AddFor(m => m.ShipCountry);
+        columns.AddFor(m => m.ShipCity);
+    })
+    .Paging(p => p.PageSize(10))
+    .FilterRow(f => f.Visible(true))
+    .HeaderFilter(f => f.Visible(true))
+    .GroupPanel(p => p.Visible(true))
+    .Grouping(g => g.AutoExpandAll(false))
+    .RemoteOperations(true)
+    .Summary(s => s
+        .TotalItems(totalItems => {
+            totalItems.AddFor(m => m.ShipCity).SummaryType(SummaryType.Count);
+        })
+        .GroupItems(groupItems => {
+            groupItems.Add().SummaryType(SummaryType.Count);
+        })
+    )
+    .OnSelectionChanged("selection_changed")
+)
+<div id="Info">
+    <p class="employeePhoto" />
+    <p class="employeeNotes"></p>
+</div>
+<script>
+    function selection_changed(selectedItems) {
+        var data = selectedItems.selectedRowsData[0];
+        if (data) {
+            $(".employeeNotes").text(data.OrderID);
+            $(".employeePhoto").text("src", data.OrderDate);
+        }
+    }
+    function exporting(e) {
+        var workbook = new ExcelJS.Workbook();
+        var worksheet = workbook.addWorksheet('Employees');
+
+        DevExpress.excelExporter.exportDataGrid({
+            component: e.component,
+            worksheet: worksheet,
+            autoFilterEnabled: true
+        }).then(function () {
+            workbook.xlsx.writeBuffer().then(function (buffer) {
+                saveAs(new Blob([buffer], { type: 'application/octet-stream' }), 'Grid.xlsx');
+            });
+        });
+        e.cancel = true;
+    }
+    function exportToPDF() {
+        var doc = new jsPDF();
+        var dataGrid = $("#gridContainer").dxDataGrid("instance");
+        DevExpress.pdfExporter.exportDataGrid({
+            jsPDFDocument: doc,
+            component: dataGrid
+        }).then(function () {
+            doc.save("Customers.pdf");
+        });
+    }
+</script>
